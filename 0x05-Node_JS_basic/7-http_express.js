@@ -1,39 +1,64 @@
 const express = require('express');
-const { argv } = require('process');
 const fs = require('fs');
 
 const app = express();
+const path = process.argv[2];
+const port = 1245;
+
+const countStudents = (path) => {
+  const promise = (res, rej) => {
+    fs.readFile(path, 'utf8', (err, resData) => {
+      if (!err) {
+        const printOut = [];
+        let printItem; // item to printed
+        const data = resData.toString().split('\n');
+        let students = data.filter((item) => item);
+        students = students.map((item) => item.split(','));
+        printItem = `Number of students: ${students.length - 1}`;
+        console.log(printItem);
+        printOut.push(printItem);
+
+        const fields = {};
+        for (const student in students) {
+          if (student !== 0) {
+            if (!fields[students[student][3]]) {
+              fields[students[student][3]] = [];
+            }
+            fields[students[student][3]].push(students[student][0]);
+          }
+        }
+        delete fields.field;
+        for (const key of Object.keys(fields)) {
+          printItem = `Number of students in ${key}: ${
+            fields[key].length}. List: ${fields[key].join(', ')}`;
+          console.log(printItem);
+          printOut.push(printItem);
+        }
+        res(printOut);
+      } else {
+        rej(new Error('Cannot load the database'));
+      }
+    });
+  };
+
+  return new Promise(promise);
+};
 
 app.get('/', (req, res) => {
-  res.set('Content-Type', 'text/plain');
   res.send('Hello Holberton School!');
 });
 
-app.get('/students', (req, res) => {
-  res.set('Content-Type', 'text/plain');
-  res.write('This is the list of our students\n');
-  fs.readFile(argv[2], 'utf8', (err, data) => {
-    if (err) {
-      throw Error('Cannot load the database');
-    }
-    const result = [];
-    data.split('\n').forEach((data) => {
-      result.push(data.split(','));
+app.get('/students', (req, res, next) => {
+  countStudents(path)
+    .then((data) => {
+      res.send(`This is the list of our students\n${data.join('\n')}`);
+    })
+    .catch((error) => {
+      next(error);
     });
-    result.shift();
-    const newis = [];
-    result.forEach((data) => newis.push([data[0], data[3]]));
-    const fields = new Set();
-    newis.forEach((item) => fields.add(item[1]));
-    const final = {};
-    fields.forEach((data) => { (final[data] = 0); });
-    newis.forEach((data) => { (final[data[1]] += 1); });
-    res.write(`Number of students: ${result.filter((check) => check.length > 3).length}\n`);
-    Object.keys(final).forEach((data) => res.write(`Number of students in ${data}: ${final[data]}. List: ${newis.filter((n) => n[1] === data).map((n) => n[0]).join(', ')}\n`));
-    res.end();
-  });
 });
 
-app.listen(1245);
+app.listen(port, () => {
+});
 
 module.exports = app;
